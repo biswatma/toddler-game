@@ -1,102 +1,167 @@
+import * as THREE from 'three';
 
-const shape = document.getElementById('shape');
+// --- Basic Setup ---
+const canvas = document.getElementById('game-canvas');
 const gameArea = document.getElementById('game-area');
-// const clickSound = document.getElementById('click-sound'); // Removed
+let scene, camera, renderer;
+let balloon;
+let popAnimation = { active: false, scale: 1, speed: 0.1 };
 
-// const colors = ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'pink', 'cyan']; // Removed color logic
-// let currentColorIndex = 0; // Removed color logic
-
-// --- Web Audio API Setup ---
+// --- Sound Generation (Copied from previous version) ---
 let audioCtx;
 try {
-    // Use || for broader browser compatibility
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 } catch (e) {
     console.warn("Web Audio API is not supported in this browser.");
-    audioCtx = null; // Ensure audioCtx is null if setup fails
+    audioCtx = null;
 }
 
-// Function to play a simple click sound
-function playClickSound() {
-    if (!audioCtx) return; // Don't play if AudioContext failed or isn't supported
-
-    // Resume context if it's suspended (required for Chrome autoplay policy)
+function playPopSound() {
+    if (!audioCtx) return;
     if (audioCtx.state === 'suspended') {
         audioCtx.resume();
     }
-
-    const oscillator = audioCtx.createOscillator();
     const gainNode = audioCtx.createGain();
-
-    oscillator.connect(gainNode);
     gainNode.connect(audioCtx.destination);
-
-    // Sound parameters (attempt at a 'pop'/'burst')
-    // Use white noise for a burst sound
-    const bufferSize = audioCtx.sampleRate * 0.1; // 0.1 seconds of noise
+    const bufferSize = audioCtx.sampleRate * 0.1;
     const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
     const output = buffer.getChannelData(0);
-
     for (let i = 0; i < bufferSize; i++) {
-        output[i] = Math.random() * 2 - 1; // Generate white noise
+        output[i] = Math.random() * 2 - 1;
     }
-
     const noiseSource = audioCtx.createBufferSource();
     noiseSource.buffer = buffer;
-
-    // Shape the noise volume for a pop
-    gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime); // Start loud
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05); // Decay quickly
-
+    gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
     noiseSource.connect(gainNode);
     noiseSource.start(audioCtx.currentTime);
-    noiseSource.stop(audioCtx.currentTime + 0.1); // Stop after 100ms
+    noiseSource.stop(audioCtx.currentTime + 0.1);
 }
-// --- End Web Audio API Setup ---
+// --- End Sound Generation ---
 
+// --- Initialization ---
+function init() {
+    // Scene
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xffffff); // White background
 
-// Function to set a random position for the shape
-function moveShape() {
-    const gameAreaRect = gameArea.getBoundingClientRect();
-    const shapeRect = shape.getBoundingClientRect();
+    // Camera
+    const aspect = gameArea.clientWidth / gameArea.clientHeight;
+    camera = new THREE.PerspectiveCamera(75, aspect, 0.1, 1000);
+    camera.position.z = 10; // Move camera back
 
-    // Calculate max possible top and left values
-    const maxTop = gameAreaRect.height - shapeRect.height;
-    const maxLeft = gameAreaRect.width - shapeRect.width;
+    // Renderer
+    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    renderer.setSize(gameArea.clientWidth, gameArea.clientHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
 
-    // Generate random positions within the bounds
-    const randomTop = Math.random() * maxTop;
-    const randomLeft = Math.random() * maxLeft;
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(5, 10, 7.5);
+    scene.add(directionalLight);
 
-    shape.style.top = `${randomTop}px`;
-    shape.style.left = `${randomLeft}px`;
+    // Create Balloon
+    createBalloon();
+
+    // Event Listeners
+    window.addEventListener('resize', onWindowResize);
+    canvas.addEventListener('click', onClick);
+
+    // Start Animation Loop
+    animate();
 }
 
-// Function to change shape color - REMOVED
-// function changeColor() {
-//     currentColorIndex = (currentColorIndex + 1) % colors.length;
-//     shape.style.backgroundColor = colors[currentColorIndex];
-// }
+// --- Balloon Creation ---
+function createBalloon() {
+    const geometry = new THREE.SphereGeometry(1.5, 32, 16); // Radius, width segments, height segments
+    const material = new THREE.MeshStandardMaterial({
+        color: 0xff0000, // Red
+        roughness: 0.5,
+        metalness: 0.1
+    });
+    balloon = new THREE.Mesh(geometry, material);
+    setRandomPosition(balloon);
+    scene.add(balloon);
+}
 
-// Event listener for clicking the shape
-shape.addEventListener('click', () => {
-    // Play the generated sound
-    playClickSound();
+// --- Positioning ---
+function setRandomPosition(object) {
+    // Define bounds based roughly on camera view
+    const bounds = { x: 5, y: 3 }; // Adjust as needed
+    object.position.x = (Math.random() - 0.5) * 2 * bounds.x;
+    object.position.y = (Math.random() - 0.5) * 2 * bounds.y;
+    object.position.z = (Math.random() - 0.5) * 2; // Add some depth variation
+}
 
-    // Burst effect: Hide, move, then show
-    shape.style.visibility = 'hidden'; // Hide the balloon
+// --- Event Handlers ---
+function onWindowResize() {
+    const width = gameArea.clientWidth;
+    const height = gameArea.clientHeight;
 
-    // Wait a short moment before moving and showing again
-    setTimeout(() => {
-        moveShape(); // Move to a new position
-        shape.style.visibility = 'visible'; // Show the balloon again
-    }, 150); // 150 milliseconds delay
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    renderer.setSize(width, height);
+}
 
-    // changeColor(); // Removed color change
-    // moveShape(); // Move is now handled in setTimeout
-});
+function onClick(event) {
+    if (popAnimation.active) return; // Don't allow clicking during pop
 
-// Initial placement of the shape
-moveShape();
-// Set initial color (optional, CSS already sets red) - REMOVED
-// shape.style.backgroundColor = colors[currentColorIndex];
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    // Calculate mouse position in normalized device coordinates (-1 to +1)
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    // Update the picking ray with the camera and mouse position
+    raycaster.setFromCamera(mouse, camera);
+
+    // Calculate objects intersecting the picking ray
+    const intersects = raycaster.intersectObject(balloon);
+
+    if (intersects.length > 0) {
+        // Clicked on the balloon!
+        playPopSound();
+        startPopAnimation();
+    }
+}
+
+// --- Animation ---
+function startPopAnimation() {
+    popAnimation.active = true;
+    popAnimation.scale = 1; // Start at full scale
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+
+    // Pop animation logic
+    if (popAnimation.active) {
+        popAnimation.scale -= popAnimation.speed; // Shrink
+        balloon.scale.set(popAnimation.scale, popAnimation.scale, popAnimation.scale);
+
+        if (popAnimation.scale <= 0) {
+            popAnimation.active = false;
+            popAnimation.scale = 0; // Ensure it's fully shrunk
+            balloon.scale.set(0, 0, 0); // Keep it hidden briefly
+            // Reposition and reset scale after a short delay
+            setTimeout(() => {
+                setRandomPosition(balloon);
+                balloon.scale.set(1, 1, 1); // Reset scale for reappearance
+            }, 100); // Delay before reappearing
+        }
+    } else {
+         // Optional: Add subtle bobbing animation when not popping
+         const time = Date.now() * 0.001;
+         balloon.position.y += Math.sin(time * 2) * 0.005;
+    }
+
+
+    renderer.render(scene, camera);
+}
+
+// --- Start ---
+init();
