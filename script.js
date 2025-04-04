@@ -1,3 +1,4 @@
+
 const shape = document.getElementById('shape');
 const gameArea = document.getElementById('game-area');
 // const clickSound = document.getElementById('click-sound'); // Removed
@@ -30,17 +31,26 @@ function playClickSound() {
     oscillator.connect(gainNode);
     gainNode.connect(audioCtx.destination);
 
-    // Sound parameters (attempt at a 'croak')
-    oscillator.type = 'sawtooth'; // A slightly harsher sound
-    oscillator.frequency.setValueAtTime(300, audioCtx.currentTime); // Lower starting pitch
-    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime); // Slightly louder start
+    // Sound parameters (attempt at a 'pop'/'burst')
+    // Use white noise for a burst sound
+    const bufferSize = audioCtx.sampleRate * 0.1; // 0.1 seconds of noise
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const output = buffer.getChannelData(0);
 
-    // Ramp down frequency more slowly for a 'croak' feel
-    oscillator.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.15); // Lower end pitch, longer duration
-    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2); // Fade out over 200ms
+    for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1; // Generate white noise
+    }
 
-    oscillator.start(audioCtx.currentTime);
-    oscillator.stop(audioCtx.currentTime + 0.2); // Stop after 200ms
+    const noiseSource = audioCtx.createBufferSource();
+    noiseSource.buffer = buffer;
+
+    // Shape the noise volume for a pop
+    gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime); // Start loud
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05); // Decay quickly
+
+    noiseSource.connect(gainNode);
+    noiseSource.start(audioCtx.currentTime);
+    noiseSource.stop(audioCtx.currentTime + 0.1); // Stop after 100ms
 }
 // --- End Web Audio API Setup ---
 
@@ -73,8 +83,17 @@ shape.addEventListener('click', () => {
     // Play the generated sound
     playClickSound();
 
+    // Burst effect: Hide, move, then show
+    shape.style.visibility = 'hidden'; // Hide the balloon
+
+    // Wait a short moment before moving and showing again
+    setTimeout(() => {
+        moveShape(); // Move to a new position
+        shape.style.visibility = 'visible'; // Show the balloon again
+    }, 150); // 150 milliseconds delay
+
     // changeColor(); // Removed color change
-    moveShape();
+    // moveShape(); // Move is now handled in setTimeout
 });
 
 // Initial placement of the shape
