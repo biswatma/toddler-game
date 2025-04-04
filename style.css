@@ -1,0 +1,41 @@
+body {
+    font-family: sans-serif;
+    text-align: center;
+    background-color: #f0f8ff; /* Light blue background */
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* Prevent scrollbars */
+}
+
+h1 {
+    color: #333;
+}
+
+#game-area {
+    position: relative; /* Needed for absolute positioning of the shape */
+    width: 90vw;
+    height: 70vh;
+    margin: 20px auto;
+    border: 2px solid #ccc;
+    background-color: #fff;
+    overflow: hidden; /* Keep shape inside */
+}
+
+#shape {
+    position: absolute; /* Allows changing top/left */
+    /* width: 100px; */ /* Let emoji size dictate */
+    /* height: 100px; */ /* Let emoji size dictate */
+    font-size: 80px; /* Make the emoji large */
+    line-height: 1; /* Adjust line height for better centering */
+    text-align: center;
+    /* background-color: red; */ /* Removed */
+    /* border-radius: 50%; */ /* Removed */
+    cursor: pointer;
+    transition: top 0.2s ease-out, left 0.2s ease-out; /* Removed background-color transition */
+    /* Start position will be set by JS */
+    /* Prevent text selection */
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
